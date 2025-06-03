@@ -1,11 +1,11 @@
-import React from "react";
+import React, { useState, useEffect } from 'react';
 import { Modal, Button, Form, Alert } from "react-bootstrap";
 
 interface UpdateEquipeProps {
   show: boolean;
   handleClose: () => void;
-  handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  handleSubmit: () => void;
+  handleChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
+  handleSubmit: () => Promise<void>;
   formErrors: { [key: string]: string };
   formData: {
     id: string;
@@ -14,7 +14,7 @@ interface UpdateEquipeProps {
     country: string;
     city: string;
     founded: string;
-    logo: string;
+    logo: string | File;
     group: string;
     createdAt: string;
     staf: {
@@ -72,8 +72,27 @@ const UpdateEquipe: React.FC<UpdateEquipeProps> = ({
   formData,
   generalError,
 }) => {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (formData.logo instanceof File) {
+      const url = URL.createObjectURL(formData.logo);
+      setPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else if (typeof formData.logo === 'string' && formData.logo) {
+      setPreviewUrl(formData.logo);
+    } else {
+      setPreviewUrl(null);
+    }
+  }, [formData.logo]);
+
   const getNestedValue = (obj: any, path: string) => {
     return path.split('.').reduce((acc, part) => acc && acc[part], obj);
+  };
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSubmit();
   };
 
   return (
@@ -82,7 +101,7 @@ const UpdateEquipe: React.FC<UpdateEquipeProps> = ({
         <Modal.Title>Update Equipe</Modal.Title>
       </Modal.Header>
       <Modal.Body>
-        <Form>
+        <Form onSubmit={onSubmit}>
           {generalError && (
             <Alert variant="danger" className="mb-3">
               {generalError}
@@ -133,16 +152,40 @@ const UpdateEquipe: React.FC<UpdateEquipeProps> = ({
               </Form.Control.Feedback>
             </Form.Group>
           ))}
+
+          <Form.Group className="mb-3">
+            <Form.Label>Logo</Form.Label>
+            <Form.Control
+              type="file"
+              name="logo"
+              onChange={handleChange}
+              accept="image/*"
+              isInvalid={!!formErrors.logo}
+            />
+            {previewUrl && (
+              <div className="mt-2">
+                <img
+                  src={previewUrl}
+                  alt="Logo preview"
+                  style={{ maxWidth: '200px', maxHeight: '200px' }}
+                />
+              </div>
+            )}
+            <Form.Control.Feedback type="invalid">
+              {formErrors.logo}
+            </Form.Control.Feedback>
+          </Form.Group>
+
+          <div className="d-flex justify-content-end gap-2">
+            <Button variant="secondary" onClick={handleClose}>
+              Cancel
+            </Button>
+            <Button variant="success" type="submit">
+              Update
+            </Button>
+          </div>
         </Form>
       </Modal.Body>
-      <Modal.Footer>
-        <Button variant="secondary" onClick={handleClose}>
-          Cancel
-        </Button>
-        <Button variant="success" onClick={handleSubmit}>
-          Update
-        </Button>
-      </Modal.Footer>
     </Modal>
   );
 };

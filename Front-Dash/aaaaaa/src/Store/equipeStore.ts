@@ -40,8 +40,8 @@ interface EquipeStore {
   loading: boolean;
   error: string | null;
   fetchTeams: () => Promise<void>;
-  addTeam: (team: Omit<Team, 'id' | '_id'>) => Promise<void>;
-  updateTeam: (id: string, team: Partial<Team>) => Promise<void>;
+  addTeam: (formData: FormData) => Promise<void>;
+  updateTeam: (id: string, formData: FormData) => Promise<void>;
   deleteTeam: (id: string) => Promise<void>;
   searchTeams: (searchTerm: string) => Team[];
 }
@@ -70,11 +70,15 @@ export const useEquipeStore = create<EquipeStore>((set, get) => ({
     }
   },
 
-  addTeam: async (team) => {
+  addTeam: async (formData: FormData) => {
     set({ loading: true, error: null });
     try {
-      console.log('Adding team:', team);
-      const response = await axiosInstance.post(`${API_BASE_URL}/team`, team);
+      console.log('Adding team:', formData);
+      const response = await axiosInstance.post(`${API_BASE_URL}/team`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
       console.log('Add team response:', response.data);
       set((state) => ({
         teams: [...state.teams, response.data.team],
@@ -91,14 +95,17 @@ export const useEquipeStore = create<EquipeStore>((set, get) => ({
     }
   },
 
-  updateTeam: async (id, team) => {
+  updateTeam: async (id: string, formData: FormData) => {
     set({ loading: true, error: null });
     try {
-      console.log('Updating team:', { id, team });
-      const response = await axiosInstance.put(`${API_BASE_URL}/team/${id}`, team);
+      console.log('Updating team:', { id, formData });
+      const response = await axiosInstance.put(`${API_BASE_URL}/team/${id}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
       console.log('Update team response:', response.data);
       
-      // Check if response.data.team exists, otherwise use response.data
       const updatedTeam = response.data.team || response.data;
       
       set((state) => ({
@@ -106,7 +113,7 @@ export const useEquipeStore = create<EquipeStore>((set, get) => ({
         loading: false,
       }));
       
-      return updatedTeam; // Return the updated team for immediate use
+      return updatedTeam;
     } catch (error) {
       const axiosError = error as AxiosError;
       console.error('Error updating team:', axiosError);
@@ -118,7 +125,7 @@ export const useEquipeStore = create<EquipeStore>((set, get) => ({
     }
   },
 
-  deleteTeam: async (id) => {
+  deleteTeam: async (id: string) => {
     set({ loading: true, error: null });
     try {
       console.log('Deleting team:', id);
@@ -139,7 +146,7 @@ export const useEquipeStore = create<EquipeStore>((set, get) => ({
     }
   },
 
-  searchTeams: (searchTerm) => {
+  searchTeams: (searchTerm: string) => {
     const teams = get().teams;
     if (!searchTerm) return teams;
     

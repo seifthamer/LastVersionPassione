@@ -44,7 +44,7 @@ interface FormData {
   country: string;
   city: string;
   founded: string;
-  logo: string;
+  logo: string | File;
   group: string;
   createdAt: string;
   staf: Staf;
@@ -184,29 +184,34 @@ const Equipe: React.FC = () => {
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    const { name, value } = e.target;
-    const keys = name.split(".");
-
-    setFormData((prev) => {
-      const updated = JSON.parse(JSON.stringify(prev));
-
-      const updateNested = (
-        obj: Record<string, unknown>,
-        keyPath: string[],
-        newValue: string
-      ): void => {
-        for (let i = 0; i < keyPath.length - 1; i++) {
-          if (!obj[keyPath[i]]) {
-            obj[keyPath[i]] = {};
+    const { name, value, files } = e.target as HTMLInputElement;
+    
+    if (name === 'logo' && files && files[0]) {
+      setFormData(prev => ({
+        ...prev,
+        logo: files[0]
+      }));
+    } else {
+      const keys = name.split(".");
+      setFormData((prev) => {
+        const updated = JSON.parse(JSON.stringify(prev));
+        const updateNested = (
+          obj: Record<string, unknown>,
+          keyPath: string[],
+          newValue: string
+        ): void => {
+          for (let i = 0; i < keyPath.length - 1; i++) {
+            if (!obj[keyPath[i]]) {
+              obj[keyPath[i]] = {};
+            }
+            obj = obj[keyPath[i]] as Record<string, unknown>;
           }
-          obj = obj[keyPath[i]] as Record<string, unknown>;
-        }
-        obj[keyPath[keyPath.length - 1]] = newValue;
-      };
-
-      updateNested(updated, keys, value);
-      return updated;
-    });
+          obj[keyPath[keyPath.length - 1]] = newValue;
+        };
+        updateNested(updated, keys, value);
+        return updated;
+      });
+    }
 
     // Clear errors for the field being changed
     setFormErrors((prev) => {
@@ -290,7 +295,29 @@ const Equipe: React.FC = () => {
     }
 
     try {
-      await addTeam(formData);
+      const uploadData = new FormData();
+      
+      // Append all form fields to FormData
+      Object.entries(formData).forEach(([key, value]) => {
+        if (key === 'staf') {
+          // Handle nested staf object
+          Object.entries(value).forEach(([stafKey, stafValue]) => {
+            if (typeof stafValue === 'object') {
+              Object.entries(stafValue).forEach(([nestedKey, nestedValue]) => {
+                uploadData.append(`staf.${stafKey}.${nestedKey}`, nestedValue as string);
+              });
+            } else {
+              uploadData.append(`staf.${stafKey}`, stafValue as string);
+            }
+          });
+        } else if (key === 'logo' && value instanceof File) {
+          uploadData.append('logo', value);
+        } else if (key !== 'id' && key !== '_id') {
+          uploadData.append(key, value as string);
+        }
+      });
+
+      await addTeam(uploadData);
       setToastMessage({ type: 'success', message: 'Team added successfully!' });
       setShowToast(true);
       handleClose();
@@ -316,7 +343,29 @@ const Equipe: React.FC = () => {
     }
 
     try {
-      await updateTeam(selectedTeamId, formData);
+      const uploadData = new FormData();
+      
+      // Append all form fields to FormData
+      Object.entries(formData).forEach(([key, value]) => {
+        if (key === 'staf') {
+          // Handle nested staf object
+          Object.entries(value).forEach(([stafKey, stafValue]) => {
+            if (typeof stafValue === 'object') {
+              Object.entries(stafValue).forEach(([nestedKey, nestedValue]) => {
+                uploadData.append(`staf.${stafKey}.${nestedKey}`, nestedValue as string);
+              });
+            } else {
+              uploadData.append(`staf.${stafKey}`, stafValue as string);
+            }
+          });
+        } else if (key === 'logo' && value instanceof File) {
+          uploadData.append('logo', value);
+        } else if (key !== 'id' && key !== '_id') {
+          uploadData.append(key, value as string);
+        }
+      });
+
+      await updateTeam(selectedTeamId, uploadData);
       setToastMessage({ type: 'success', message: 'Team updated successfully!' });
       setShowToast(true);
       setShowUpdateModal(false);
