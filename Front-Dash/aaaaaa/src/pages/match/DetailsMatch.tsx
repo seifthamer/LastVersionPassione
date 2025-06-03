@@ -12,10 +12,7 @@ interface Player {
   name: string;
   team: {
     _id: string;
-    id?: number;
-    code: string;
     name: string;
-    logo: string;
   };
   position: 'Goalkeeper' | 'Defender' | 'Midfielder' | 'Attacker';
   number: number;
@@ -261,16 +258,16 @@ const DetailsMatch = () => {
   }, [id])
 
   // Fetch match events
-  useEffect(() => {
-    const fetchMatchEvents = async () => {
-      try {
-        const response = await axios.get(`${API_Match_EVENT_URL}/match/${id}`)
-        setMatchEvents(response.data)
-      } catch (error) {
-        console.error('Error fetching match events:', error)
-      }
+  const fetchMatchEvents = async () => {
+    try {
+      const response = await axios.get(`${API_Match_EVENT_URL}/match/${id}`)
+      setMatchEvents(response.data)
+    } catch (error) {
+      console.error('Error fetching match events:', error)
     }
+  }
 
+  useEffect(() => {
     if (id) {
       fetchMatchEvents()
     }
@@ -281,7 +278,7 @@ const DetailsMatch = () => {
     console.log('Filtering players for team:', teamId);
     console.log('All players:', players);
     const teamPlayers = players.filter(player => {
-      console.log('Player team ID:', player.team._id, 'Selected team ID:', teamId);
+      console.log('playerName', player.name, 'Player team ID:', player.team._id, 'Selected team ID:', teamId);
       return player.team._id === teamId;
     });
     console.log('Filtered players:', teamPlayers);
@@ -308,6 +305,8 @@ const DetailsMatch = () => {
         time: 0,
         goalType: 'regular'
       })
+      // Refetch match events
+      await fetchMatchEvents()
     } catch (error) {
       console.error('Error creating goal:', error)
     }
@@ -328,6 +327,8 @@ const DetailsMatch = () => {
         playerIn: '',
         time: 0
       })
+      // Refetch match events
+      await fetchMatchEvents()
     } catch (error) {
       console.error('Error creating substitution:', error)
     }
@@ -348,6 +349,8 @@ const DetailsMatch = () => {
         time: 0,
         cardType: 'direct'
       })
+      // Refetch match events
+      await fetchMatchEvents()
     } catch (error) {
       console.error('Error creating red card:', error)
     }
@@ -367,6 +370,8 @@ const DetailsMatch = () => {
         goalkeeper: '',
         time: 0
       })
+      // Refetch match events
+      await fetchMatchEvents()
     } catch (error) {
       console.error('Error creating penalty save:', error)
     }
@@ -387,6 +392,8 @@ const DetailsMatch = () => {
         points: 0,
         reason: ''
       })
+      // Refetch match events
+      await fetchMatchEvents()
     } catch (error) {
       console.error('Error creating bonus point:', error)
     }

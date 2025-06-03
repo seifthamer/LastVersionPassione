@@ -3,7 +3,7 @@ import axiosInstance from './axiosConfig';
 
 // Define the base URL for your backend player API
 // Ensure this matches where your backend is running
-const API_BASE_URL = 'http://localhost:5000/player'; // Check port and base path
+export const API_BASE_URL = 'http://localhost:5000/player'; // Check port and base path
 
 // --- Interfaces based on Backend PlayerSchema ---
 

@@ -19,6 +19,7 @@ import styled from "styled-components";
 import { MdAdd, MdDelete } from "react-icons/md";
 import { FaEdit, FaSearch } from "react-icons/fa"; // Import FaSearch for search input
 import { Pagination as BootstrapPagination } from "react-bootstrap"; // Import Pagination
+import axios from "axios";
 
 // --- Store Import ---
 import {
@@ -29,6 +30,7 @@ import {
   Player,
   CreatePlayerData,
   UpdatePlayerData,
+  API_BASE_URL,
 } from "../../Store/joueurStore"; // Adjust path to your store file
 
 // --- Import Modal Component AND Utility Function from the modal file ---
@@ -320,7 +322,7 @@ const Joueur: React.FC = () => {
 
   // Add/Edit Submission Handler...
   const handleModalSubmit = useCallback(
-    async (formData: PlayerFormData) => {
+    async (formData: PlayerFormData, formDataObj?: FormData) => {
       setError(null);
       setIsSubmitting(true);
       try {
@@ -330,8 +332,23 @@ const Joueur: React.FC = () => {
           await updatePlayer(selectedPlayerId, backendData as UpdatePlayerData);
           setToastMessage("Player updated successfully!");
         } else {
-          await createPlayer(backendData as CreatePlayerData);
-          setToastMessage("Player added successfully!");
+          // If we have FormData (for file upload), use it
+          if (formDataObj) {
+            const response = await axios.post(API_BASE_URL, formDataObj, {
+              headers: {
+                'Content-Type': 'multipart/form-data',
+              },
+            });
+            if (response.data.status === "success") {
+              setToastMessage("Player added successfully!");
+            } else {
+              throw new Error(response.data.message || "Failed to add player");
+            }
+          } else {
+            // Fallback to regular JSON data if no file
+            await createPlayer(backendData as CreatePlayerData);
+            setToastMessage("Player added successfully!");
+          }
         }
         setShowToast(true);
         handleCloseModal();

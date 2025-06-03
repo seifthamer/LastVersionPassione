@@ -33,7 +33,7 @@ export const isValidObjectId = (id: string): boolean => {
 export interface AjouterJoueurModalProps {
   show: boolean;
   handleClose: () => void;
-  handleSubmit: (formData: PlayerFormData) => Promise<void>;
+  handleSubmit: (formData: PlayerFormData, formDataObj: FormData) => Promise<void>;
   initialData?: PlayerFormData | null;
   isEditing: boolean;
   fields: PlayerFormField[];
@@ -219,7 +219,46 @@ export const AjouterJoueurModal: React.FC<AjouterJoueurModalProps> = ({
       return;
     }
 
-    // Create a properly formatted form data object
+    // Create FormData object for file upload
+    const formDataObj = new FormData();
+
+    // Add the file if it exists
+    if (selectedFile) {
+      formDataObj.append('logo', selectedFile);
+    }
+
+    // Add all other form fields
+    formDataObj.append('name', formData.name?.trim() || '');
+    formDataObj.append('age', formData.age?.toString() || '');
+    formDataObj.append('number', formData.number?.toString() || '');
+    formDataObj.append('position', formData.position?.trim() || '');
+    
+    // Add team data in the correct structure
+    const teamData = {
+      _id: formData.team_id?.trim() || '',
+      teamname: formData.team_name?.trim() || ''
+    };
+    // Send team as a separate field
+    Object.entries(teamData).forEach(([key, value]) => {
+      formDataObj.append(`team[${key}]`, value);
+    });
+    
+    formDataObj.append('availabilityStatus', formData.availabilityStatus?.trim() || 'available');
+    
+    if (formData.availabilityReason) {
+      formDataObj.append('availabilityReason', formData.availabilityReason.trim());
+    }
+    if (formData.value) {
+      formDataObj.append('value', formData.value.trim());
+    }
+    if (formData.value_passionne) {
+      formDataObj.append('value_passionne', formData.value_passionne.trim());
+    }
+    if (formData.height) {
+      formDataObj.append('height', formData.height.trim());
+    }
+
+    // Create a properly formatted form data object for the handleSubmit function
     const formattedData: PlayerFormData = {
       name: formData.name?.trim() || '',
       age: formData.age?.toString() || '',
@@ -228,7 +267,6 @@ export const AjouterJoueurModal: React.FC<AjouterJoueurModalProps> = ({
       team_id: formData.team_id?.trim() || '',
       availabilityStatus: formData.availabilityStatus?.trim() || 'available',
       ...(formData.availabilityReason && { availabilityReason: formData.availabilityReason.trim() }),
-      ...(formData.logo && { logo: formData.logo }),
       ...(formData.value && { value: formData.value.trim() }),
       ...(formData.value_passionne && { value_passionne: formData.value_passionne.trim() }),
       ...(formData.height && { height: formData.height.trim() })
@@ -242,7 +280,8 @@ export const AjouterJoueurModal: React.FC<AjouterJoueurModalProps> = ({
       formattedData.team_logo = selectedTeam.logo;
     }
 
-    await handleSubmit(formattedData);
+    // Pass both the FormData and formatted data to handleSubmit
+    await handleSubmit(formattedData, formDataObj);
   };
 
   // Update validateForm function
