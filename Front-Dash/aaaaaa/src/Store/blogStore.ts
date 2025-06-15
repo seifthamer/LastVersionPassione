@@ -45,16 +45,21 @@ export const getBlogById = async (id: string): Promise<Blog> => {
 // Create new blog
 export const createBlog = async (blogData: BlogFormData): Promise<Blog> => {
   try {
-    // Convert form data to match server model
-    const serverData = {
-      type: blogData.type,
-      title: blogData.titre,
-      author: blogData.author,
-      content: blogData.description,
-      logo: blogData.image instanceof File ? URL.createObjectURL(blogData.image) : blogData.image
-    };
+    const formData = new FormData();
+    formData.append('type', blogData.type);
+    formData.append('title', blogData.titre);
+    formData.append('author', blogData.author);
+    formData.append('content', blogData.description);
+    
+    if (blogData.image instanceof File) {
+      formData.append('logo', blogData.image);
+    }
 
-    const response = await axios.post(API_URL, serverData);
+    const response = await axios.post(API_URL, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data.data;
   } catch (error) {
     console.error('Error creating blog:', error);

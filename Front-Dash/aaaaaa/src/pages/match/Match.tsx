@@ -71,10 +71,23 @@ const SearchContainer = styled.div`
 
 const PaginationContainer = styled.div`
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
+  align-items: center;
   margin-top: 20px;
   .pagination {
     margin-bottom: 0;
+  }
+`;
+
+const LimitSelector = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  
+  select {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid #ced4da;
   }
 `;
 
@@ -91,6 +104,7 @@ const formFields: FormFieldConfig[] = [
   { name: "date", label: "Date", type: "datetime-local", required: true },
   { name: "stadename", label: "Stadium Name", type: "text", required: true },
   { name: "stadecity", label: "Stadium City", type: "text", required: true },
+  { name: "statuslong", label: "Match Status", type: "select", required: true },
   {
     name: "teamshome",
     label: "Home Team",
@@ -146,7 +160,18 @@ const MatchModal: React.FC<MatchModalProps> = ({
     e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => {
+      const newData = { ...prev, [name]: value };
+      // Update statusshort based on statuslong
+      if (name === 'statuslong') {
+        newData.statusshort = value === 'Not Started' ? 'NS' :
+                             value === 'In Progress' ? 'IP' :
+                             value === 'Finished' ? 'FT' :
+                             value === 'Postponed' ? 'PST' :
+                             value === 'Cancelled' ? 'CANC' : 'NS';
+      }
+      return newData;
+    });
     if (formErrors[name]) {
       setFormErrors((prev) => ({ ...prev, [name]: undefined }));
     }
@@ -183,24 +208,44 @@ const MatchModal: React.FC<MatchModalProps> = ({
   };
 
   const renderField = (field: FormFieldConfig) => {
-    if (field.type === "select" && (field.name === "teamshome" || field.name === "teamsaway")) {
-      return (
-        <Form.Select
-          name={field.name}
-          value={getFieldValue(field.name)}
-          onChange={handleInputChange}
-          isInvalid={!!formErrors[field.name]}
-          disabled={isLoading}
-          aria-label={`Select ${field.label}`}
-        >
-          <option value="">Select {field.label}</option>
-          {teams.map((team) => (
-            <option key={team._id} value={team._id}>
-              {team.name}
-            </option>
-          ))}
-        </Form.Select>
-      );
+    if (field.type === "select") {
+      if (field.name === "teamshome" || field.name === "teamsaway") {
+        return (
+          <Form.Select
+            name={field.name}
+            value={getFieldValue(field.name)}
+            onChange={handleInputChange}
+            isInvalid={!!formErrors[field.name]}
+            disabled={isLoading}
+            aria-label={`Select ${field.label}`}
+          >
+            <option value="">Select {field.label}</option>
+            {teams.map((team) => (
+              <option key={team._id} value={team._id}>
+                {team.name}
+              </option>
+            ))}
+          </Form.Select>
+        );
+      } else if (field.name === "statuslong") {
+        return (
+          <Form.Select
+            name={field.name}
+            value={getFieldValue(field.name)}
+            onChange={handleInputChange}
+            isInvalid={!!formErrors[field.name]}
+            disabled={isLoading}
+            aria-label={`Select ${field.label}`}
+          >
+            <option value="">Select {field.label}</option>
+            <option value="Not Started">Not Started</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Finished">Finished</option>
+            <option value="Postponed">Postponed</option>
+            <option value="Cancelled">Cancelled</option>
+          </Form.Select>
+        );
+      }
     }
 
     return (
@@ -281,7 +326,7 @@ const Match: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentFixtureId, setCurrentFixtureId] = useState<string | undefined>();
   const [currentPlayerData, setCurrentPlayerData] = useState<FormDataType | null>(
@@ -291,42 +336,33 @@ const Match: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
-
-  // Filter fixtures based on search term
-  const filteredFixtures = useMemo(() => {
-    if (!searchTerm) return fixtures;
-
-    const term = searchTerm.toLowerCase();
-    return fixtures.filter((fixture) => {
-      return (
-        fixture.referee?.toLowerCase().includes(term) ||
-        fixture.round?.toLowerCase().includes(term) ||
-        fixture.stadename?.toLowerCase().includes(term) ||
-        fixture.stadecity?.toLowerCase().includes(term) ||
-        fixture.teamshome?.name?.toLowerCase().includes(term) ||
-        fixture.teamsaway?.name?.toLowerCase().includes(term) ||
-        fixture.statuslong?.toLowerCase().includes(term) ||
-        fixture.statusshort?.toLowerCase().includes(term)
-      );
-    });
-  }, [fixtures, searchTerm]);
-
-  // Pagination calculations using filteredFixtures
-  const totalItems = filteredFixtures.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredFixtures.slice(
-    indexOfFirstItem,
-    indexOfLastItem
-  );
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
 
   const fetchFixtures = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getAllFixtures();
-      setFixtures(data);
+      const requestParams = {
+        page: currentPage,
+        sortBy: 'date',
+        sortOrder: 'desc' as const,
+        search: searchTerm,
+        ...(itemsPerPage > 0 && { limit: itemsPerPage })
+      };
+
+      const response = await getAllFixtures(requestParams);
+      
+      // Handle the new response format
+      setFixtures(response.data || []);
+      
+      // Update pagination and limit from API response
+      if (response.pagination) {
+        setTotalPages(response.pagination.pages);
+        setTotalItems(response.pagination.total);
+        setCurrentPage(response.pagination.page);
+        setItemsPerPage(response.pagination.limit); // Update itemsPerPage from API
+      }
     } catch (err) {
       setError(
         "Failed to fetch matches. Please check the connection or try again later."
@@ -335,17 +371,20 @@ const Match: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentPage, itemsPerPage, searchTerm]);
 
   useEffect(() => {
     fetchFixtures();
   }, [fetchFixtures]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filteredFixtures]);
+  const paginate = (pageNumber: number) => {
+    setCurrentPage(pageNumber);
+  };
 
-  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+  const handleSearch = (value: string) => {
+    setSearchTerm(value);
+    setCurrentPage(1);
+  };
 
   const handleShowAdd = () => {
     setIsEditing(false);
@@ -394,6 +433,8 @@ const Match: React.FC = () => {
       date: formData.date ? new Date(formData.date).toISOString() : undefined,
       stadename: formData.stadename,
       stadecity: formData.stadecity,
+      statuslong: formData.statuslong,
+      statusshort: formData.statusshort,
       teamshome: {
         _id: formData.teamshome,
       },
@@ -476,6 +517,12 @@ const Match: React.FC = () => {
     }
   };
 
+  const handleLimitChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newLimit = parseInt(e.target.value);
+    setItemsPerPage(newLimit);
+    setCurrentPage(1); // Reset to first page when changing limit
+  };
+
   const tableHeaders = useMemo(
     () => [
       "Referee",
@@ -506,10 +553,7 @@ const Match: React.FC = () => {
             type="text"
             placeholder="Search matches..."
             value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setCurrentPage(1);
-            }}
+            onChange={(e) => handleSearch(e.target.value)}
           />
         </SearchContainer>
         <ButtonGroup>
@@ -568,7 +612,7 @@ const Match: React.FC = () => {
                   </Spinner>
                 </td>
               </tr>
-            ) : filteredFixtures.length === 0 && !error ? (
+            ) : fixtures.length === 0 && !error ? (
               <tr>
                 <td colSpan={tableHeaders.length} className="text-center">
                   {searchTerm
@@ -577,7 +621,7 @@ const Match: React.FC = () => {
                 </td>
               </tr>
             ) : (
-              currentItems.map((fixture) => (
+              fixtures.map((fixture: Fixture) => (
                 <tr key={fixture._id}>
                   <td>{fixture.referee || "-"}</td>
                   <td>{fixture.round}</td>
@@ -592,7 +636,6 @@ const Match: React.FC = () => {
                   <td>{fixture.teamsaway?.name || "-"}</td>
                   <td>{fixture.statuslong || "-"}</td>
                   <td>{fixture.statusshort || "-"}</td>
-
                   <td>
                     <Button
                       variant="outline-success"
@@ -638,7 +681,7 @@ const Match: React.FC = () => {
         </Table>
       </div>
 
-      {filteredFixtures.length > itemsPerPage && (
+      {totalItems > 0 && (
         <PaginationContainer>
           <Pagination>
             <Pagination.First
@@ -671,6 +714,21 @@ const Match: React.FC = () => {
               disabled={currentPage === totalPages}
             />
           </Pagination>
+
+          <LimitSelector>
+            <span>Items per page:</span>
+            <Form.Select
+              value={itemsPerPage}
+              onChange={handleLimitChange}
+              size="sm"
+              style={{ width: 'auto' }}
+            >
+              <option value={1}>1</option>
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+            </Form.Select>
+          </LimitSelector>
         </PaginationContainer>
       )}
 

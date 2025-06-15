@@ -33,11 +33,23 @@ const AppRouter = () => {
     return <>{children}</>;
   };
 
+  // Public Route component (for login)
+  const PublicRoute = ({ children }: { children: React.ReactNode }) => {
+    if (token) {
+      return <Navigate to="/" replace />;
+    }
+    return <>{children}</>;
+  };
+
   return (
     <Routes>
       <Route
         path="/login"
-        element={token ? <Navigate to="/" replace /> : <Login />}
+        element={
+          <PublicRoute>
+            <Login />
+          </PublicRoute>
+        }
       />
 
       {/* Protected routes */}

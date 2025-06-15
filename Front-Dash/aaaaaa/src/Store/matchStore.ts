@@ -65,29 +65,93 @@ export type CreateFixtureData = {
 // You will need to MAP your `PlayerForm` data from Match.tsx TO this structure.
 export type UpdateFixtureData = Partial<Omit<Fixture, '_id'>>;
 
+interface PaginationParams {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
+
+interface SortParams {
+  sortBy: string;
+  sortOrder: 'asc' | 'desc';
+}
+
+interface FixtureResponse {
+  data: Fixture[];
+  status: string;
+  pagination: PaginationParams;
+  sort: SortParams;
+  filters?: {
+    status?: string;
+    round?: string;
+    teamId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  };
+}
 
 // --- API Service Functions ---
 
 /**
  * Fetches all fixtures from the backend.
  * Corresponds to: GET /fixture
- * @returns Promise<Fixture[]> - A promise resolving to an array of fixtures.
+ * @returns Promise<FixtureResponse> - A promise resolving to the fixtures and pagination information.
  */
-export const getAllFixtures = async (): Promise<Fixture[]> => {
+export const getAllFixtures = async (params?: {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  status?: string;
+  round?: string;
+  teamId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  search?: string;
+}): Promise<FixtureResponse> => {
   try {
-    // The backend wraps the array in a 'data' property
-    const response = await axiosInstance.get<{ data: Fixture[]; status: string }>(API_BASE_URL);
-    console.log("API Response (getAllFixtures):", response.data); // Log for debugging
-    // Ensure the expected structure is returned
-    if (response.data && Array.isArray(response.data.data)) {
-        return response.data.data;
-    } else {
-        console.error("Unexpected response format from GET /fixture:", response.data);
-        return []; // Return empty array as a fallback
-    }
+    const {
+      page = 1,
+      limit = 1, // Default limit is 5
+      sortBy = 'date',
+      sortOrder = 'asc',
+      status,
+      round,
+      teamId,
+      dateFrom,
+      dateTo,
+      search
+    } = params || {};
+
+    // Build query string
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(), // Ensure limit is converted to string
+      sortBy,
+      sortOrder,
+      ...(status && { status }),
+      ...(round && { round }),
+      ...(teamId && { teamId }),
+      ...(dateFrom && { dateFrom }),
+      ...(dateTo && { dateTo }),
+      ...(search && { search })
+    });
+
+    console.log('Fetching fixtures with params:', {
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+      search
+    });
+
+    const response = await axiosInstance.get<FixtureResponse>(`${API_BASE_URL}?${queryParams}`);
+    console.log("API Response (getAllFixtures):", response.data);
+    return response.data;
   } catch (error) {
     console.error('Error fetching all fixtures:', error);
-    throw error; // Re-throw error to be handled by the calling component (e.g., show error message)
+    throw error;
   }
 };
 

@@ -361,31 +361,31 @@ const EquipeModal: React.FC<Props> = ({
 
           <Form.Group className="mb-3">
             <Form.Label>Recruiter 1</Form.Label>
-            <Form.Control
-              type="text"
+              <Form.Control
+                type="text"
               name="staf.recruteurs.recr1"
               value={formData.staf.recruteurs.recr1}
-              onChange={handleChange}
+                onChange={handleChange}
               isInvalid={!!formErrors['staf.recruteurs.recr1']}
-            />
-            <Form.Control.Feedback type="invalid">
+              />
+              <Form.Control.Feedback type="invalid">
               {formErrors['staf.recruteurs.recr1']}
-            </Form.Control.Feedback>
-          </Form.Group>
+              </Form.Control.Feedback>
+            </Form.Group>
 
           <Form.Group className="mb-3">
             <Form.Label>Recruiter 2</Form.Label>
-            <Form.Control
-              type="text"
+              <Form.Control
+                type="text"
               name="staf.recruteurs.recr2"
               value={formData.staf.recruteurs.recr2}
-              onChange={handleChange}
+                onChange={handleChange}
               isInvalid={!!formErrors['staf.recruteurs.recr2']}
-            />
-            <Form.Control.Feedback type="invalid">
+              />
+              <Form.Control.Feedback type="invalid">
               {formErrors['staf.recruteurs.recr2']}
-            </Form.Control.Feedback>
-          </Form.Group>
+              </Form.Control.Feedback>
+            </Form.Group>
 
           <div className="d-flex justify-content-end gap-2">
             <Button variant="secondary" onClick={handleClose}>

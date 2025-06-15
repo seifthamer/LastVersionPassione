@@ -29,7 +29,7 @@ interface AuthState {
 
 const useAuthStore = create<AuthState>((set) => ({
   user: null,
-  token: null,
+  token: localStorage.getItem('token'),
   isLoading: false,
   error: null,
 
@@ -41,7 +41,6 @@ const useAuthStore = create<AuthState>((set) => ({
         username,
         password,
       });
-      console.log('Login response:', response);
       const { token, user } = response.data;
       
       set({ user, token, isLoading: false });
@@ -68,6 +67,7 @@ const useAuthStore = create<AuthState>((set) => ({
     const token = localStorage.getItem('token');
     if (token) {
       set({ token });
+      axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     }
   },
 }));

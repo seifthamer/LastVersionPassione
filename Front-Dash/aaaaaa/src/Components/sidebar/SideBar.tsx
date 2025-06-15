@@ -11,6 +11,13 @@ import { GrGallery } from "react-icons/gr";
 
 interface SidebarWrapperProps {
   collapsed: boolean;
+  textColor: string;
+  backgroundColor: string;
+  className?: string;
+  breakpoint?: string;
+  toggled?: boolean;
+  minWidth?: string;
+  maxWidth?: string;
 }
 
 interface IconProps {
@@ -27,6 +34,10 @@ interface ToggleProps {
   collapsed: boolean;
 }
 
+interface SidebarProps {
+  collapsed: boolean;
+  setCollapsed: (collapsed: boolean) => void;
+}
 
 const SidebarWrapper = styled(CDBSidebar)<SidebarWrapperProps>`
   height: 100vh;
@@ -37,6 +48,7 @@ const SidebarWrapper = styled(CDBSidebar)<SidebarWrapperProps>`
   width: ${(props) => (props.collapsed ? "80px" : "250px")} !important;
   min-width: ${(props) => (props.collapsed ? "80px" : "250px")} !important;
   z-index: 1000;
+  background-color: ${(props) => props.backgroundColor};
 
   & * {
     box-sizing: border-box;
@@ -48,11 +60,7 @@ const SidebarWrapper = styled(CDBSidebar)<SidebarWrapperProps>`
   }
 
   @media (max-width: 768px) {
-    width: ${(props) => (props.collapsed ? "0" : "250px")} !important;
-    min-width: ${(props) => (props.collapsed ? "0" : "250px")} !important;
-    transform: translateX(${(props) => (props.collapsed ? "-100%" : "0")});
-
-    & .pro-sidebar {
+    .pro-sidebar {
       min-width: ${(props) => (props.collapsed ? "0" : "250px")} !important;
       width: ${(props) => (props.collapsed ? "0" : "250px")} !important;
     }
@@ -132,6 +140,9 @@ const ToggleIcon = styled.div`
   display: flex;
   align-items: center;
   color: #f8f9fa;
+  @media (max-width: 768px) {
+    display: flex !important;
+  }
 `;
 
 const MobileOverlay = styled.div<OverlayProps>`
@@ -200,65 +211,36 @@ const ArrowIcon = styled.span<{ isOpen: boolean }>`
   align-items: center;
 `;
 
-const Sidebar = () => {
-  const [collapsed, setCollapsed] = useState<boolean>(false);
-  const [isMobile, setIsMobile] = useState<boolean>(false);
+const Sidebar = ({ collapsed, setCollapsed }: SidebarProps) => {
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [gestionOpen, setGestionOpen] = useState<boolean>(false);
 
   useEffect(() => {
-    const checkSize = () => {
-      const mobile = window.innerWidth <= 768;
-      setIsMobile(mobile);
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
-      if (mobile && !isMobile) {
-        setCollapsed(true);
-      }
-
-      if (!mobile && isMobile && collapsed) {
-        setCollapsed(false);
-      }
-    };
-
-    checkSize();
-    window.addEventListener("resize", checkSize);
-    return () => {
-      window.removeEventListener("resize", checkSize);
-    };
-  }, [isMobile, collapsed]);
-
-  const toggleSidebar = () => {
-    setCollapsed((prev) => !prev);
-  };
-
-  const toggleGestion = () => {
-    setGestionOpen(!gestionOpen);
-  };
+  const toggleGestion = () => setGestionOpen((prev) => !prev);
 
   return (
     <>
-      {isMobile && (
-        <MobileToggle collapsed={collapsed} onClick={toggleSidebar}>
-          <HiMenuAlt2 size={24} />
-        </MobileToggle>
-      )}
-
-      <MobileOverlay
-        show={isMobile}
-        collapsed={collapsed}
-        onClick={toggleSidebar}
-      />
-
+      <MobileOverlay show={isMobile && !collapsed} collapsed={collapsed} onClick={() => setCollapsed(true)} />
       <SidebarWrapper
+        collapsed={collapsed}
         textColor="red"
         backgroundColor="#2c3e50"
-        collapsed={collapsed}
+        className="custom-sidebar"
+        breakpoint="md"
+        toggled={!collapsed}
+        minWidth="80px"
+        maxWidth="250px"
       >
         <SidebarHeaderWrapper>
-          <ToggleIcon onClick={toggleSidebar}>
+          <ToggleIcon onClick={() => setCollapsed(!collapsed)}>
             <HiMenuAlt2 />
           </ToggleIcon>
         </SidebarHeaderWrapper>
-
         <ContentWrapper>
           <Nav className="w-100">
             <List>

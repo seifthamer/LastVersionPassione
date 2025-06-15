@@ -20,6 +20,7 @@ import { MdAdd, MdDelete } from "react-icons/md";
 import { FaEdit, FaSearch } from "react-icons/fa"; // Import FaSearch for search input
 import { Pagination as BootstrapPagination } from "react-bootstrap"; // Import Pagination
 import axios from "axios";
+import { debounce } from "lodash";
 
 // --- Store Import ---
 import {
@@ -144,6 +145,17 @@ const formFields: PlayerFormField[] = [
   },
 ];
 
+// Add PlayerResponse type
+interface PlayerResponse {
+  data: Player[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
 // --- Main Joueur Component ---
 const Joueur: React.FC = () => {
   // State...
@@ -153,45 +165,79 @@ const Joueur: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [currentPlayerData, setCurrentPlayerData] =
-    useState<PlayerFormData | null>(null);
+  const [currentPlayerData, setCurrentPlayerData] = useState<PlayerFormData | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("Operation successful!");
 
   // --- Search State ---
-  const [searchTerm, setSearchTerm] = useState(""); // State for the search input
+  const [searchTerm, setSearchTerm] = useState("");
 
   // --- Pagination State ---
-  const [currentPage, setCurrentPage] = useState(1); // Current active page
-  const [itemsPerPage] = useState(10); // Number of items to show per page
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalItems, setTotalItems] = useState(0);
 
   // Data Fetching...
   const fetchPlayers = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await getAllPlayers();
-      console.log('Fetched players:', data); // Debug log
-      setPlayers(data);
+      const queryParams = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+        ...(searchTerm && { search: searchTerm })
+      });
+
+      const response = await axios.get(`${API_BASE_URL}?${queryParams}`);
+      console.log('Fetched players:', response.data);
+      
+      if (response.data.status === "success") {
+        setPlayers(response.data.data);
+        setTotalPages(response.data.pagination.pages);
+        setTotalItems(response.data.pagination.total);
+        setCurrentPage(response.data.pagination.page);
+        setItemsPerPage(response.data.pagination.limit);
+      } else {
+        throw new Error(response.data.error || 'Failed to fetch players');
+      }
     } catch (err) {
       console.error('Error in fetchPlayers:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch players');
+      setPlayers([]);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [currentPage, itemsPerPage, searchTerm]);
 
   useEffect(() => {
     fetchPlayers();
-  }, [fetchPlayers]); // Effect depends on fetchPlayers useCallback
+  }, [fetchPlayers]);
 
-  // --- Reset page to 1 when search term changes ---
-  // This ensures that when filtering, you start from the first page of results
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm]);
+  // Update the handleLimitChange function
+  const handleLimitChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newLimit = parseInt(e.target.value);
+    setItemsPerPage(newLimit);
+    setCurrentPage(1); // Reset to first page when changing limit
+  };
+
+  // Update the handlePageChange function
+  const handlePageChange = (pageNumber: number) => {
+    if (pageNumber >= 1 && pageNumber <= totalPages) {
+      setCurrentPage(pageNumber);
+    }
+  };
+
+  // Update the search handler to debounce the search
+  const handleSearch = useCallback(
+    debounce((value: string) => {
+      setSearchTerm(value);
+      setCurrentPage(1); // Reset to first page when searching
+    }, 500),
+    []
+  );
 
   // --- Mapping and FINAL Validation Function ---
   const mapFormDataToBackend = useCallback(
@@ -242,9 +288,7 @@ const Joueur: React.FC = () => {
         position: formData.position!.trim(),
         team: { 
           _id: formData.team_id!,
-          name: formData.team_name || "",
-          code: formData.team_code || "",
-          logo: formData.team_logo || ""
+          teamname: formData.team_name || ""
         },
         availabilityStatus: formData.availabilityStatus as Player["availabilityStatus"],
         ...(formData.logo?.trim() && { logo: formData.logo.trim() }),
@@ -346,8 +390,8 @@ const Joueur: React.FC = () => {
             }
           } else {
             // Fallback to regular JSON data if no file
-            await createPlayer(backendData as CreatePlayerData);
-            setToastMessage("Player added successfully!");
+          await createPlayer(backendData as CreatePlayerData);
+          setToastMessage("Player added successfully!");
           }
         }
         setShowToast(true);
@@ -420,57 +464,10 @@ const Joueur: React.FC = () => {
     }
   }, [selectedPlayerId, searchTerm, currentPage, itemsPerPage]);
 
-  // --- Memoized Filtering ---
-  // Filter players based on search term
-  const filteredPlayers = useMemo(() => {
-    if (!searchTerm) {
-      return players; // If no search term, use the full list
-    }
-    const lowerCaseSearchTerm = searchTerm.toLowerCase();
-    return players.filter((player) => {
-      return (
-        player.name?.toLowerCase().includes(lowerCaseSearchTerm) ||
-        player.team?.name?.toLowerCase().includes(lowerCaseSearchTerm) || // Search by team name
-        player.team?.code?.toLowerCase().includes(lowerCaseSearchTerm) || // Search by team code
-        player.position?.toLowerCase().includes(lowerCaseSearchTerm) ||
-        String(player.age ?? "").includes(lowerCaseSearchTerm) ||
-        String(player.number ?? "").includes(lowerCaseSearchTerm)
-        // Add more fields to search if needed
-      );
-    });
-  }, [players, searchTerm]); // Depends on original players list and search term
-
-  // --- Memoized Pagination Logic ---
-
-  // Calculate total pages based on the *filtered* players list
-  const totalPages = useMemo(() => {
-    // Ensure calculation is based on filtered players
-    return Math.ceil(filteredPlayers.length / itemsPerPage);
-  }, [filteredPlayers.length, itemsPerPage]); // Depends on filtered players count
-
-  // Get players for the current page by slicing the *filtered* players list
+  // Remove the filteredPlayers memo since filtering is now handled by the backend
   const currentPlayers = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    // Slice from the *filtered* list of players
-    return filteredPlayers.slice(startIndex, endIndex);
-  }, [filteredPlayers, currentPage, itemsPerPage]); // Depends on the filtered list and pagination state
-
-  // Handle page change
-  const handlePageChange = (pageNumber: number) => {
-    // Ensure the requested page is within bounds
-    if (pageNumber >= 1 && pageNumber <= totalPages) {
-      setCurrentPage(pageNumber);
-    } else if (pageNumber < 1) {
-      setCurrentPage(1); // Prevent going below page 1
-    } else if (pageNumber > totalPages && totalPages > 0) {
-      // Prevent going above total pages (and only if total pages > 0)
-      setCurrentPage(totalPages);
-    } else if (totalPages === 0) {
-      // If there are no pages, go to page 1 (or stay there)
-      setCurrentPage(1);
-    }
-  };
+    return players;
+  }, [players]);
 
   // Table Headers... (remains the same)
   const tableHeaders = useMemo(
@@ -493,7 +490,7 @@ const Joueur: React.FC = () => {
 
   // Render pagination items (similar to Equipe component, includes ellipsis for many pages)
   const renderPaginationItems = () => {
-    if (totalPages <= 1 && filteredPlayers.length <= itemsPerPage) {
+    if (totalPages <= 1) {
       return null;
     }
 
@@ -544,7 +541,6 @@ const Joueur: React.FC = () => {
     // Last page and ellipsis
     if (endPage < totalPages) {
       if (endPage < totalPages - 1) {
-        // Show ellipsis only if there's at least one page between end and last
         items.push(
           <BootstrapPagination.Ellipsis key="ellipsis-end" disabled />
         );
@@ -562,7 +558,7 @@ const Joueur: React.FC = () => {
       <BootstrapPagination.Next
         key="next"
         onClick={() => handlePageChange(currentPage + 1)}
-        disabled={currentPage === totalPages || totalPages === 0} // totalPages === 0 check added
+        disabled={currentPage === totalPages}
       />
     );
 
@@ -584,7 +580,7 @@ const Joueur: React.FC = () => {
             placeholder="Rechercher un joueur..."
             className="form-control"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearch(e.target.value)}
           />
         </SearchContainer>
         <Button
@@ -619,9 +615,29 @@ const Joueur: React.FC = () => {
           <Toast.Header closeButton={false}>
             <strong className="me-auto">Success</strong>
           </Toast.Header>
-          <Toast.Body className="text-white">{toastMessage}</Toast.Body>ag{" "}
+          <Toast.Body className="text-white">{toastMessage}</Toast.Body>
         </Toast>
       </ToastContainer>
+      {/* Add limit selector */}
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <div className="d-flex align-items-center">
+          <span className="me-2">Items per page:</span>
+          <Form.Select
+            value={itemsPerPage}
+            onChange={handleLimitChange}
+            size="sm"
+            style={{ width: 'auto' }}
+          >
+            <option value={5}>5</option>
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+          </Form.Select>
+        </div>
+        <div>
+          Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} entries
+        </div>
+      </div>
       {/* Player Data Table */}
       <div style={{ overflowX: "auto", width: "100%", cursor: "pointer" }}>
         <Table bordered hover responsive size="sm">
@@ -715,10 +731,41 @@ const Joueur: React.FC = () => {
         </Table>
       </div>
 
-      {/* --- Pagination Controls --- */}
-      {renderPaginationItems() && ( // Only render container if there are pagination items (more than 1 page)
+      {/* Update pagination controls */}
+      {totalPages > 0 && (
         <PaginationContainer>
-          <BootstrapPagination>{renderPaginationItems()}</BootstrapPagination>
+          <BootstrapPagination>
+            <BootstrapPagination.First
+              onClick={() => handlePageChange(1)}
+              disabled={currentPage === 1}
+            />
+            <BootstrapPagination.Prev
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+            />
+            
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              const pageNumber = i + 1;
+              return (
+                <BootstrapPagination.Item
+                  key={pageNumber}
+                  active={pageNumber === currentPage}
+                  onClick={() => handlePageChange(pageNumber)}
+                >
+                  {pageNumber}
+                </BootstrapPagination.Item>
+              );
+            })}
+
+            <BootstrapPagination.Next
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            />
+            <BootstrapPagination.Last
+              onClick={() => handlePageChange(totalPages)}
+              disabled={currentPage === totalPages}
+            />
+          </BootstrapPagination>
         </PaginationContainer>
       )}
 

@@ -64,8 +64,6 @@ const RightSection = styled.div<RightSectionProps>`
   }
 `;
 
-
-
 const IconWrapper = styled.div`
   width: 36px;
   height: 36px;
@@ -105,9 +103,8 @@ const Avatar = styled.img`
 
 const MobileMenuButton = styled.div`
   display: none;
-
   @media (max-width: 768px) {
-    display: flex;
+    display: flex !important;
     align-items: center;
     justify-content: center;
     width: 36px;
@@ -117,11 +114,11 @@ const MobileMenuButton = styled.div`
     cursor: pointer;
     margin-left: 10px;
     transition: background-color 0.2s ease;
-
+    z-index: 2001;
+    position: relative;
     &:hover {
       background-color: #e2e8f0;
     }
-
     svg {
       width: 20px;
       height: 20px;
@@ -167,7 +164,7 @@ const UserInfo = styled.div`
   }
 `;
 
-const Navbar: React.FC = () => {
+const Navbar: React.FC<{ setSidebarCollapsed?: (collapsed: boolean) => void }> = ({ setSidebarCollapsed }) => {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
 
   const toggleMenu = () => {
@@ -183,8 +180,8 @@ const Navbar: React.FC = () => {
           </Logo>
         </LeftSection>
 
-        <MobileMenuButton onClick={toggleMenu}>
-          {isMenuOpen ? <FiX /> : <FiMenu />}
+        <MobileMenuButton onClick={() => setSidebarCollapsed && setSidebarCollapsed(false)}>
+          <FiMenu />
         </MobileMenuButton>
 
         <RightSection isOpen={isMenuOpen}>
@@ -192,8 +189,6 @@ const Navbar: React.FC = () => {
             <Avatar src={Picture} alt="profile" />
             <span>User Name</span>
           </UserInfo>
-
-      
 
           <IconWrapper>
             <FiSettings size={18} />

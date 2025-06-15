@@ -114,6 +114,25 @@ export type CreatePlayerData = {
 // MUST align with what the `PUT /player/:id` endpoint expects in req.body
 export type UpdatePlayerData = Partial<Omit<Player, '_id'>>; // Allow partial updates, _id is immutable
 
+interface PaginationParams {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
+
+interface SortParams {
+  sortBy: string;
+  sortOrder: 'asc' | 'desc';
+}
+
+interface PlayerResponse {
+  data: Player[];
+  status: string;
+  pagination: PaginationParams;
+  sort: SortParams;
+}
+
 // --- API Service Functions ---
 
 /**
@@ -121,20 +140,37 @@ export type UpdatePlayerData = Partial<Omit<Player, '_id'>>; // Allow partial up
  * Corresponds to: GET /player
  * @returns Promise<Player[]>
  */
-export const getAllPlayers = async (): Promise<Player[]> => {
+export const getAllPlayers = async (params?: { 
+  page?: number; 
+  limit?: number; 
+  sortBy?: string; 
+  sortOrder?: 'asc' | 'desc';
+  search?: string;
+}): Promise<PlayerResponse> => {
   try {
-    // Backend wraps the array in a 'data' property
-    const response = await axiosInstance.get<{ data: Player[]; status: string }>(API_BASE_URL);
+    const { 
+      page = 1, 
+      limit = 10, 
+      sortBy = 'name', 
+      sortOrder = 'asc',
+      search = ''
+    } = params || {};
+
+    // Build query string
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      sortBy,
+      sortOrder,
+      ...(search && { search })
+    });
+
+    const response = await axiosInstance.get<PlayerResponse>(`${API_BASE_URL}?${queryParams}`);
     console.log("API Response (getAllPlayers):", response.data);
-    if (response.data && Array.isArray(response.data.data)) {
-        return response.data.data;
-    } else {
-        console.error("Unexpected response format from GET /player:", response.data);
-        return [];
-    }
+    return response.data;
   } catch (error) {
     console.error('Error fetching all players:', error);
-    throw error; // Re-throw for component error handling
+    throw error;
   }
 };
 
@@ -169,25 +205,58 @@ export const getPlayerById = async (id: string): Promise<Player | null> => {
  * @param teamId The Mongoose _id of the Team.
  * @returns Promise<Player[]>
  */
-export const getPlayersByTeamId = async (teamId: string): Promise<Player[]> => {
-    if (!teamId) {
-        console.error("getPlayersByTeamId requires a valid team ID.");
-        return [];
-    }
-    try {
-        // Backend wraps the array in 'data'
-        const response = await axiosInstance.get<{ data: Player[]; status: string; teamId: string }>(`${API_BASE_URL}/team/${teamId}`);
-        console.log(`API Response (getPlayersByTeamId ${teamId}):`, response.data);
-        if (response.data && Array.isArray(response.data.data)) {
-            return response.data.data;
-        } else {
-            console.error(`Unexpected response format from GET /player/team/${teamId}:`, response.data);
-            return [];
-        }
-    } catch (error) {
-        console.error(`Error fetching players for team id ${teamId}:`, error);
-        throw error;
-    }
+export const getPlayersByTeamId = async (
+  teamId: string,
+  params?: { 
+    page?: number; 
+    limit?: number; 
+    sortBy?: string; 
+    sortOrder?: 'asc' | 'desc';
+  }
+): Promise<PlayerResponse> => {
+  if (!teamId) {
+    console.error("getPlayersByTeamId requires a valid team ID.");
+    return {
+      data: [],
+      status: 'error',
+      pagination: {
+        page: 1,
+        limit: 10,
+        total: 0,
+        pages: 0
+      },
+      sort: {
+        sortBy: 'name',
+        sortOrder: 'asc'
+      }
+    };
+  }
+
+  try {
+    const { 
+      page = 1, 
+      limit = 10, 
+      sortBy = 'name', 
+      sortOrder = 'asc'
+    } = params || {};
+
+    // Build query string
+    const queryParams = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      sortBy,
+      sortOrder
+    });
+
+    const response = await axiosInstance.get<PlayerResponse>(
+      `${API_BASE_URL}/team/${teamId}?${queryParams}`
+    );
+    console.log(`API Response (getPlayersByTeamId ${teamId}):`, response.data);
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching players for team id ${teamId}:`, error);
+    throw error;
+  }
 };
 
 

@@ -119,7 +119,7 @@ const Equipe: React.FC = () => {
     founded: "",
     logo: "",
     group: "",
-    createdAt: "",
+    createdAt: new Date().toISOString(),
     staf: {
       entprincipal: "",
       entadjoints: { entadj1: "", entadj2: "" },
@@ -159,7 +159,7 @@ const Equipe: React.FC = () => {
       founded: "",
       logo: "",
       group: "",
-      createdAt: "",
+      createdAt: new Date().toISOString(),
       staf: {
         entprincipal: "",
         entadjoints: { entadj1: "", entadj2: "" },
@@ -310,8 +310,11 @@ const Equipe: React.FC = () => {
               uploadData.append(`staf.${stafKey}`, stafValue as string);
             }
           });
-        } else if (key === 'logo' && value instanceof File) {
-          uploadData.append('logo', value);
+        } else if (key === 'logo') {
+          // Only append logo if it's a File
+          if (value instanceof File) {
+            uploadData.append('logo', value);
+          }
         } else if (key !== 'id' && key !== '_id') {
           uploadData.append(key, value as string);
         }
@@ -358,8 +361,14 @@ const Equipe: React.FC = () => {
               uploadData.append(`staf.${stafKey}`, stafValue as string);
             }
           });
-        } else if (key === 'logo' && value instanceof File) {
-          uploadData.append('logo', value);
+        } else if (key === 'logo') {
+          // Only append logo if it's a File
+          if (value instanceof File) {
+            uploadData.append('logo', value);
+          }
+        } else if (key === 'createdAt') {
+          // Skip createdAt field as it's handled by the backend
+          return;
         } else if (key !== 'id' && key !== '_id') {
           uploadData.append(key, value as string);
         }
@@ -695,7 +704,7 @@ const Equipe: React.FC = () => {
               founded: "",
               logo: "",
               group: "",
-              createdAt: "",
+              createdAt: new Date().toISOString(),
               staf: {
                 entprincipal: "",
                 entadjoints: { entadj1: "", entadj2: "" },

@@ -35,11 +35,25 @@ interface Team {
   staf: Staf;
 }
 
+interface PaginationParams {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
+
+interface SortParams {
+  sortBy: string;
+  sortOrder: 'asc' | 'desc';
+}
+
 interface EquipeStore {
   teams: Team[];
   loading: boolean;
   error: string | null;
-  fetchTeams: () => Promise<void>;
+  pagination: PaginationParams;
+  sort: SortParams;
+  fetchTeams: (params?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string }) => Promise<void>;
   addTeam: (formData: FormData) => Promise<void>;
   updateTeam: (id: string, formData: FormData) => Promise<void>;
   deleteTeam: (id: string) => Promise<void>;
@@ -52,20 +66,72 @@ export const useEquipeStore = create<EquipeStore>((set, get) => ({
   teams: [],
   loading: false,
   error: null,
+  pagination: {
+    page: 1,
+    limit: 10,
+    total: 0,
+    pages: 0
+  },
+  sort: {
+    sortBy: 'name',
+    sortOrder: 'asc'
+  },
 
-  fetchTeams: async () => {
+  fetchTeams: async (params = {}) => {
     set({ loading: true, error: null });
     try {
+      const { page = 1, limit = 10, sortBy = 'name', sortOrder = 'asc', search = '' } = params;
+      
+      // Build query string
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        sortBy,
+        sortOrder,
+        ...(search && { search })
+      });
+
       console.log('Fetching teams...');
-      const response = await axiosInstance.get(`${API_BASE_URL}/team`);
+      const response = await axiosInstance.get(`${API_BASE_URL}/team?${queryParams}`);
       console.log('Teams response:', response.data);
-      set({ teams: response.data.teams || [], loading: false });
+
+      // Handle both old and new response formats
+      const responseData = response.data;
+      const teams = responseData.data || responseData.teams || [];
+      const pagination = responseData.pagination || {
+        page: responseData.meta?.currentPage || page,
+        limit: responseData.meta?.limit || limit,
+        total: responseData.meta?.total || teams.length,
+        pages: responseData.meta?.totalPages || Math.ceil(teams.length / limit)
+      };
+      const sort = responseData.sort || {
+        sortBy,
+        sortOrder
+      };
+
+      set({ 
+        teams,
+        pagination,
+        sort,
+        loading: false 
+      });
     } catch (error) {
       const axiosError = error as AxiosError;
       console.error('Error fetching teams:', axiosError);
       set({ 
         error: axiosError.response?.data?.message || 'Failed to fetch teams', 
-        loading: false 
+        loading: false,
+        teams: [],
+        pagination: {
+          page: 1,
+          limit: 10,
+          total: 0,
+          pages: 0
+        },
+        sort: {
+          sortBy: 'name',
+          sortOrder: 'asc'
+        }
       });
     }
   },
@@ -81,7 +147,7 @@ export const useEquipeStore = create<EquipeStore>((set, get) => ({
       });
       console.log('Add team response:', response.data);
       set((state) => ({
-        teams: [...state.teams, response.data.team],
+        teams: [...state.teams, response.data.data],
         loading: false,
       }));
     } catch (error) {
@@ -106,7 +172,7 @@ export const useEquipeStore = create<EquipeStore>((set, get) => ({
       });
       console.log('Update team response:', response.data);
       
-      const updatedTeam = response.data.team || response.data;
+      const updatedTeam = response.data.data;
       
       set((state) => ({
         teams: state.teams.map((t) => (t._id === id ? updatedTeam : t)),

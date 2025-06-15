@@ -1,7 +1,11 @@
 import axios from 'axios';
+import useAuthStore from './authStore';
 
 const axiosInstance = axios.create({
   baseURL: 'http://localhost:5000',
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
 // Add a request interceptor
@@ -25,7 +29,7 @@ axiosInstance.interceptors.response.use(
     if (error.response?.status === 401) {
       // Clear token and redirect to login
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      useAuthStore.getState().logout();
     }
     return Promise.reject(error);
   }
